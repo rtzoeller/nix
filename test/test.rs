@@ -29,6 +29,7 @@ mod test_poll;
 #[cfg(not(any(target_os = "redox", target_os = "fuchsia")))]
 mod test_pty;
 #[cfg(any(target_os = "android",
+          target_os = "freebsd",
           target_os = "linux"))]
 mod test_sched;
 #[cfg(any(target_os = "android",
@@ -72,6 +73,8 @@ lazy_static! {
     pub static ref KMOD_MTX: Mutex<()> = Mutex::new(());
     /// Any test that calls ptsname(3) must grab this mutex.
     pub static ref PTSNAME_MTX: Mutex<()> = Mutex::new(());
+    /// Any test that reads/writes the process scheduler must grab this mutex.
+    pub static ref SCHED_MTX: Mutex<()> = Mutex::new(());
     /// Any test that alters signal handling must grab this mutex.
     pub static ref SIGNAL_MTX: Mutex<()> = Mutex::new(());
 }
