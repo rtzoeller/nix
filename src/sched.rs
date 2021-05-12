@@ -223,6 +223,69 @@ mod sched_linux_like {
 
         Errno::result(res).map(drop)
     }
+
+    libc_bitflags! {
+        pub struct SchedFlags: c_int {
+            #[cfg(target_os = "android")]
+            SCHED_NORMAL;
+            #[cfg(target_os = "linux")]
+            SCHED_OTHER;
+            SCHED_FIFO;
+            SCHED_RR;
+            SCHED_BATCH;
+            SCHED_IDLE;
+            #[cfg(target_os = "android")]
+            SCHED_DEADLINE;
+            #[cfg(target_os = "linux")]
+            SCHED_RESET_ON_FORK;
+        }
+    }
+
+    #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub struct SchedParam(libc::sched_param);
+
+    impl SchedParam {
+        pub fn new(priority: i32) -> Self {
+            let mut sched_param: libc::sched_param = unsafe { mem::zeroed() };
+            sched_param.sched_priority = priority;
+            SchedParam(sched_param)
+        }
+
+        pub fn priority(&self) -> i32 {
+            self.0.sched_priority
+        }
+    }
+
+    impl Default for SchedParam {
+        fn default() -> Self {
+            SchedParam::new(0)
+        }
+    }
+
+    /// Set thread's scheduling policy and parameters
+    ///
+    /// `pid` is the thread ID to update.
+    /// If `pid` is None or zero, then the policy and parameters for the calling thread are set.
+    ///
+    /// See also [`sched_setscheduler(2)`](https://man7.org/linux/man-pages/man2/sched_setscheduler.2.html)
+    pub fn sched_setscheduler(pid: Option<Pid>, policy: SchedFlags, sched_param: SchedParam) -> Result<()> {
+        let res = unsafe { libc::sched_setscheduler(pid.unwrap_or(Pid::from_raw(0)).into(), policy.bits(), &sched_param.0) };
+
+        Errno::result(res).map(drop)
+    }
+
+    /// Get thread's scheduling policy and parameters
+    ///
+    /// `pid` is the thread ID to check.
+    /// If `pid` is None or zero, then the policy and parameters for the calling thread are retrieved.
+    ///
+    /// See also [`sched_getscheduler(2)`](https://man7.org/linux/man-pages/man2/sched_getscheduler.2.html)
+    pub fn sched_getscheduler(pid: Option<Pid>) -> Result<SchedFlags> {
+        let res = unsafe { libc::sched_getscheduler(pid.unwrap_or(Pid::from_raw(0)).into()) };
+
+        Errno::result(res).map(SchedFlags::from_bits_truncate)
+    }
 }
 
 /// Explicitly yield the processor to other threads.

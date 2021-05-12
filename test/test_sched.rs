@@ -1,4 +1,4 @@
-use nix::sched::{sched_getaffinity, sched_setaffinity, CpuSet};
+use nix::sched::{sched_getaffinity, sched_setaffinity, sched_getscheduler, sched_setscheduler, CpuSet, SchedFlags, SchedParam};
 use nix::unistd::Pid;
 
 #[test]
@@ -29,4 +29,35 @@ fn test_sched_affinity() {
 
     // Finally, reset the initial CPU set
     sched_setaffinity(Pid::from_raw(0), &initial_affinity).unwrap();
+}
+
+#[test]
+#[cfg(not(target_env = "musl"))]
+fn test_sched_scheduler() {
+    let initial_scheduler = sched_getscheduler(None).unwrap();
+
+    // Pick a scheduler other than the current one
+    let desired_scheduler = match initial_scheduler {
+        #[cfg(target_os = "android")]
+        SchedFlags::SCHED_BATCH => SchedFlags::SCHED_NORMAL,
+        #[cfg(target_os = "linux")]
+        SchedFlags::SCHED_BATCH => SchedFlags::SCHED_OTHER,
+        _ => SchedFlags::SCHED_BATCH,
+    };
+    sched_setscheduler(None, desired_scheduler, SchedParam::default()).unwrap();
+
+    // Check that the scheduler was changed.
+    assert!(sched_getscheduler(None).unwrap().contains(desired_scheduler));
+
+    // Restore original scheduler
+    sched_setscheduler(None, initial_scheduler, SchedParam::default()).unwrap();
+}
+
+#[test]
+#[cfg(not(target_env = "musl"))]
+fn test_sched_getscheduler_none_is_pid_zero() {
+    let none_scheduler = sched_getscheduler(None).unwrap();
+    let pid_zero_scheduler = sched_getscheduler(Some(Pid::from_raw(0))).unwrap();
+
+    assert_eq!(none_scheduler, pid_zero_scheduler);
 }
