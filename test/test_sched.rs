@@ -1,4 +1,4 @@
-use nix::sched::{sched_getaffinity, sched_setaffinity, sched_getscheduler, sched_setscheduler, CpuSet, SchedFlags, SchedParam};
+use nix::sched::{sched_getaffinity, sched_setaffinity, sched_getparam, sched_getscheduler, sched_setscheduler, CpuSet, SchedFlags, SchedParam};
 use nix::unistd::Pid;
 
 #[test]
@@ -60,4 +60,13 @@ fn test_sched_getscheduler_none_is_pid_zero() {
     let pid_zero_scheduler = sched_getscheduler(Some(Pid::from_raw(0))).unwrap();
 
     assert_eq!(none_scheduler, pid_zero_scheduler);
+}
+
+#[test]
+#[cfg(not(target_env = "musl"))]
+fn test_sched_getparam_none_is_pid_zero() {
+    let none_param = sched_getparam(None).unwrap();
+    let pid_zero_param = sched_getparam(Some(Pid::from_raw(0))).unwrap();
+
+    assert_eq!(none_param, pid_zero_param);
 }

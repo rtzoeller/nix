@@ -263,6 +263,49 @@ mod sched_linux_like {
         }
     }
 
+    /// Get minimum priority value for policy
+    ///
+    /// See also [`sched_get_priority_min(2)`](https://man7.org/linux/man-pages/man2/sched_get_priority_min.2.html)
+    pub fn sched_get_priority_min(policy: SchedFlags) -> Result<i32> {
+        let res = unsafe { libc::sched_get_priority_min(policy.bits()) };
+
+        Errno::result(res)
+    }
+
+    /// Get maximum priority value for policy
+    ///
+    /// See also [`sched_get_priority_max(2)`](https://man7.org/linux/man-pages/man2/sched_get_priority_max.2.html)
+    pub fn sched_get_priority_max(policy: SchedFlags) -> Result<i32> {
+        let res = unsafe { libc::sched_get_priority_max(policy.bits()) };
+
+        Errno::result(res)
+    }
+
+    /// Set thread's scheduling parameters
+    ///
+    /// `pid` is the thread ID to update.
+    /// If `pid` is None or zero, then the parameters for the calling thread are set.
+    ///
+    /// See also [`sched_setparam(2)`](https://man7.org/linux/man-pages/man2/sched_setparam.2.html)
+    pub fn sched_setparam(pid: Option<Pid>, sched_param: SchedParam) -> Result<()> {
+        let res = unsafe { libc::sched_setparam(pid.unwrap_or(Pid::from_raw(0)).into(), &sched_param.0) };
+
+        Errno::result(res).map(drop)
+    }
+
+    /// Get thread's scheduling parameters
+    ///
+    /// `pid` is the thread ID to check.
+    /// If `pid` is None or zero, then the parameters for the calling thread are retrieved.
+    ///
+    /// See also [`sched_getparam(2)`](https://man7.org/linux/man-pages/man2/sched_getparam.2.html)
+    pub fn sched_getparam(pid: Option<Pid>) -> Result<SchedParam> {
+        let mut sched_param = mem::MaybeUninit::uninit();
+        let res = unsafe { libc::sched_getparam(pid.unwrap_or(Pid::from_raw(0)).into(), sched_param.as_mut_ptr()) };
+
+        Errno::result(res).map(|_| unsafe { SchedParam(sched_param.assume_init()) })
+    }
+
     /// Set thread's scheduling policy and parameters
     ///
     /// `pid` is the thread ID to update.
