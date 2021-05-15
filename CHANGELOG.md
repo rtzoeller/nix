@@ -122,6 +122,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Added `sendfile64` (#[1439](https://github.com/nix-rust/nix/pull/1439))
 - Added `MS_LAZYTIME` to `MsFlags`
   (#[1437](https://github.com/nix-rust/nix/pull/1437))
+- Added `sched_setscheduler` and associated functions
+  (#[1435](https://github.com/nix-rust/nix/pull/1435))
 
 ### Changed
 - Made `forkpty` unsafe, like `fork`
