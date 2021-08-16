@@ -6,12 +6,12 @@ pub use self::sched_linux_like::*;
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod sched_linux_like {
     use crate::errno::Errno;
+    use crate::unistd::Pid;
+    use crate::{Error, Result};
     use libc::{self, c_int, c_void};
     use std::mem;
     use std::option::Option;
     use std::os::unix::io::RawFd;
-    use crate::unistd::Pid;
-    use crate::{Error, Result};
 
     // For some functions taking with a parameter of type CloneFlags,
     // only a subset of these flags have an effect.
@@ -80,7 +80,9 @@ mod sched_linux_like {
             if field >= CpuSet::count() {
                 Err(Error::from(Errno::EINVAL))
             } else {
-                unsafe { libc::CPU_SET(field, &mut self.cpu_set); }
+                unsafe {
+                    libc::CPU_SET(field, &mut self.cpu_set);
+                }
                 Ok(())
             }
         }
@@ -91,7 +93,9 @@ mod sched_linux_like {
             if field >= CpuSet::count() {
                 Err(Error::from(Errno::EINVAL))
             } else {
-                unsafe { libc::CPU_CLR(field, &mut self.cpu_set);}
+                unsafe {
+                    libc::CPU_CLR(field, &mut self.cpu_set);
+                }
                 Ok(())
             }
         }
@@ -200,9 +204,7 @@ mod sched_linux_like {
             let ptr = stack.as_mut_ptr().add(stack.len());
             let ptr_aligned = ptr.sub(ptr as usize % 16);
             libc::clone(
-                mem::transmute(
-                    callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32,
-                ),
+                mem::transmute(callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32),
                 ptr_aligned as *mut c_void,
                 combined,
                 &mut cb as *mut _ as *mut c_void,
@@ -223,21 +225,106 @@ mod sched_linux_like {
 
         Errno::result(res).map(drop)
     }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "redox")))]
+pub use self::sched_scheduler::*;
+
+#[cfg(not(any(target_os = "macos", target_os = "redox")))]
+mod sched_scheduler {
+    use crate::unistd::Pid;
+    use crate::{Errno, Result};
+    use libc::{self, c_int};
+    use std::convert::TryFrom;
+    use std::mem;
+
+    libc_enum! {
+        #[repr(i32)]
+        #[non_exhaustive]
+        pub enum SchedType {
+            #[cfg(target_os = "android")]
+            SCHED_NORMAL,
+            #[cfg(any(target_os = "freebsd", target_os = "fuchsia", target_os = "linux", target_os = "netbsd"))]
+            SCHED_OTHER,
+            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
+            SCHED_FIFO,
+            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
+            SCHED_RR,
+            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+            SCHED_BATCH,
+            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+            SCHED_IDLE,
+            #[cfg(target_os = "android")]
+            SCHED_DEADLINE,
+        }
+
+        impl TryFrom<i32>
+    }
 
     libc_bitflags! {
         pub struct SchedFlags: c_int {
-            #[cfg(target_os = "android")]
-            SCHED_NORMAL;
-            #[cfg(target_os = "linux")]
-            SCHED_OTHER;
-            SCHED_FIFO;
-            SCHED_RR;
-            SCHED_BATCH;
-            SCHED_IDLE;
-            #[cfg(target_os = "android")]
-            SCHED_DEADLINE;
             #[cfg(target_os = "linux")]
             SCHED_RESET_ON_FORK;
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub struct SchedPolicy {
+        pub sched_type: SchedType,
+        #[cfg(target_os = "linux")]
+        pub sched_flags: SchedFlags,
+    }
+
+    impl SchedPolicy {
+        pub fn new(sched_type: SchedType) -> Self {
+            SchedPolicy::_with_flags(sched_type, SchedFlags::empty())
+        }
+
+        pub fn with_flags(sched_type: SchedType, sched_flags: SchedFlags) -> Self {
+            SchedPolicy::_with_flags(sched_type, sched_flags)
+        }
+
+        #[cfg(target_os = "linux")]
+        pub const fn bits(&self) -> i32 {
+            self.sched_type as i32 | self.sched_flags.bits()
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        pub const fn bits(&self) -> i32 {
+            self.sched_type as i32
+        }
+
+        #[cfg(target_os = "linux")]
+        pub fn from_bits(bits: i32) -> Option<Self> {
+            let type_bits = bits & !SchedFlags::all().bits();
+            let sched_type = SchedType::try_from(type_bits).ok()?;
+            let flag_bits = bits & SchedFlags::all().bits();
+            let sched_flags = SchedFlags::from_bits(flag_bits)?;
+            Some(SchedPolicy::with_flags(sched_type, sched_flags))
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        pub fn from_bits(bits: i32) -> Option<Self> {
+            let type_bits = bits & !SchedFlags::all().bits();
+            let sched_type = SchedType::try_from(type_bits).ok()?;
+            Some(SchedPolicy::new(sched_type))
+        }
+
+        #[cfg(target_os = "linux")]
+        #[inline]
+        fn _with_flags(sched_type: SchedType, sched_flags: SchedFlags) -> Self {
+            SchedPolicy {
+                sched_type,
+                sched_flags,
+            }
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        #[inline]
+        fn _with_flags(sched_type: SchedType, _sched_flags: SchedFlags) -> Self {
+            SchedPolicy {
+                sched_type,
+            }
         }
     }
 
@@ -252,7 +339,7 @@ mod sched_linux_like {
             SchedParam(sched_param)
         }
 
-        pub fn priority(&self) -> i32 {
+        pub const fn priority(&self) -> i32 {
             self.0.sched_priority
         }
     }
@@ -265,8 +352,8 @@ mod sched_linux_like {
 
     /// Get minimum priority value for policy
     ///
-    /// See also [`sched_get_priority_min(2)`](https://man7.org/linux/man-pages/man2/sched_get_priority_min.2.html)
-    pub fn sched_get_priority_min(policy: SchedFlags) -> Result<i32> {
+    /// See also [`sched_get_priority_min(2)`](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_get_priority_min.html)
+    pub fn sched_get_priority_min(policy: SchedPolicy) -> Result<i32> {
         let res = unsafe { libc::sched_get_priority_min(policy.bits()) };
 
         Errno::result(res)
@@ -274,8 +361,8 @@ mod sched_linux_like {
 
     /// Get maximum priority value for policy
     ///
-    /// See also [`sched_get_priority_max(2)`](https://man7.org/linux/man-pages/man2/sched_get_priority_max.2.html)
-    pub fn sched_get_priority_max(policy: SchedFlags) -> Result<i32> {
+    /// See also [`sched_get_priority_max(2)`](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_get_priority_max.html)
+    pub fn sched_get_priority_max(policy: SchedPolicy) -> Result<i32> {
         let res = unsafe { libc::sched_get_priority_max(policy.bits()) };
 
         Errno::result(res)
@@ -286,9 +373,10 @@ mod sched_linux_like {
     /// `pid` is the thread ID to update.
     /// If `pid` is None or zero, then the parameters for the calling thread are set.
     ///
-    /// See also [`sched_setparam(2)`](https://man7.org/linux/man-pages/man2/sched_setparam.2.html)
+    /// See also [`sched_setparam(2)`](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_setparam.html)
     pub fn sched_setparam(pid: Option<Pid>, sched_param: SchedParam) -> Result<()> {
-        let res = unsafe { libc::sched_setparam(pid.unwrap_or(Pid::from_raw(0)).into(), &sched_param.0) };
+        let res =
+            unsafe { libc::sched_setparam(pid.unwrap_or_else(|| Pid::from_raw(0)).into(), &sched_param.0) };
 
         Errno::result(res).map(drop)
     }
@@ -298,10 +386,15 @@ mod sched_linux_like {
     /// `pid` is the thread ID to check.
     /// If `pid` is None or zero, then the parameters for the calling thread are retrieved.
     ///
-    /// See also [`sched_getparam(2)`](https://man7.org/linux/man-pages/man2/sched_getparam.2.html)
+    /// See also [`sched_getparam(2)`](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_getparam.html)
     pub fn sched_getparam(pid: Option<Pid>) -> Result<SchedParam> {
         let mut sched_param = mem::MaybeUninit::uninit();
-        let res = unsafe { libc::sched_getparam(pid.unwrap_or(Pid::from_raw(0)).into(), sched_param.as_mut_ptr()) };
+        let res = unsafe {
+            libc::sched_getparam(
+                pid.unwrap_or_else(|| Pid::from_raw(0)).into(),
+                sched_param.as_mut_ptr(),
+            )
+        };
 
         Errno::result(res).map(|_| unsafe { SchedParam(sched_param.assume_init()) })
     }
@@ -311,9 +404,19 @@ mod sched_linux_like {
     /// `pid` is the thread ID to update.
     /// If `pid` is None or zero, then the policy and parameters for the calling thread are set.
     ///
-    /// See also [`sched_setscheduler(2)`](https://man7.org/linux/man-pages/man2/sched_setscheduler.2.html)
-    pub fn sched_setscheduler(pid: Option<Pid>, policy: SchedFlags, sched_param: SchedParam) -> Result<()> {
-        let res = unsafe { libc::sched_setscheduler(pid.unwrap_or(Pid::from_raw(0)).into(), policy.bits(), &sched_param.0) };
+    /// See also [`sched_setscheduler(2)`](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_setscheduler.html)
+    pub fn sched_setscheduler(
+        pid: Option<Pid>,
+        policy: SchedPolicy,
+        sched_param: SchedParam,
+    ) -> Result<()> {
+        let res = unsafe {
+            libc::sched_setscheduler(
+                pid.unwrap_or_else(|| Pid::from_raw(0)).into(),
+                policy.bits(),
+                &sched_param.0,
+            )
+        };
 
         Errno::result(res).map(drop)
     }
@@ -323,11 +426,11 @@ mod sched_linux_like {
     /// `pid` is the thread ID to check.
     /// If `pid` is None or zero, then the policy and parameters for the calling thread are retrieved.
     ///
-    /// See also [`sched_getscheduler(2)`](https://man7.org/linux/man-pages/man2/sched_getscheduler.2.html)
-    pub fn sched_getscheduler(pid: Option<Pid>) -> Result<SchedFlags> {
-        let res = unsafe { libc::sched_getscheduler(pid.unwrap_or(Pid::from_raw(0)).into()) };
+    /// See also [`sched_getscheduler(2)`](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_getscheduler.html)
+    pub fn sched_getscheduler(pid: Option<Pid>) -> Result<SchedPolicy> {
+        let res = unsafe { libc::sched_getscheduler(pid.unwrap_or_else(|| Pid::from_raw(0)).into()) };
 
-        Errno::result(res).map(SchedFlags::from_bits_truncate)
+        Errno::result(res).and(SchedPolicy::from_bits(res).ok_or(Errno::EINVAL))
     }
 }
 

@@ -1,4 +1,7 @@
-use nix::sched::{sched_getaffinity, sched_setaffinity, sched_getparam, sched_getscheduler, sched_setscheduler, CpuSet, SchedFlags, SchedParam};
+use nix::sched::{
+    sched_getaffinity, sched_getparam, sched_getscheduler, sched_setaffinity, sched_setscheduler,
+    CpuSet, SchedParam, SchedPolicy, SchedType,
+};
 use nix::unistd::Pid;
 
 #[test]
@@ -37,17 +40,22 @@ fn test_sched_scheduler() {
     let initial_scheduler = sched_getscheduler(None).unwrap();
 
     // Pick a scheduler other than the current one
-    let desired_scheduler = match initial_scheduler {
+    let desired_scheduler = match initial_scheduler.sched_type {
         #[cfg(target_os = "android")]
-        SchedFlags::SCHED_BATCH => SchedFlags::SCHED_NORMAL,
+        SchedType::SCHED_BATCH => SchedType::SCHED_NORMAL,
         #[cfg(target_os = "linux")]
-        SchedFlags::SCHED_BATCH => SchedFlags::SCHED_OTHER,
-        _ => SchedFlags::SCHED_BATCH,
+        SchedType::SCHED_BATCH => SchedType::SCHED_OTHER,
+        _ => SchedType::SCHED_BATCH,
     };
-    sched_setscheduler(None, desired_scheduler, SchedParam::default()).unwrap();
+    sched_setscheduler(
+        None,
+        SchedPolicy::new(desired_scheduler),
+        SchedParam::default(),
+    )
+    .unwrap();
 
     // Check that the scheduler was changed.
-    assert!(sched_getscheduler(None).unwrap().contains(desired_scheduler));
+    assert!(sched_getscheduler(None).unwrap().sched_type == desired_scheduler);
 
     // Restore original scheduler
     sched_setscheduler(None, initial_scheduler, SchedParam::default()).unwrap();
