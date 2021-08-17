@@ -225,10 +225,10 @@ mod sched_linux_like {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "redox")))]
+#[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "redox")))]
 pub use self::sched_scheduler::*;
 
-#[cfg(not(any(target_os = "macos", target_os = "redox")))]
+#[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "redox")))]
 mod sched_scheduler {
     use crate::unistd::Pid;
     use crate::{Errno, Result};
