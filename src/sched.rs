@@ -6,12 +6,12 @@ pub use self::sched_linux_like::*;
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod sched_linux_like {
     use crate::errno::Errno;
-    use crate::unistd::Pid;
-    use crate::{Error, Result};
     use libc::{self, c_int, c_void};
     use std::mem;
     use std::option::Option;
     use std::os::unix::io::RawFd;
+    use crate::unistd::Pid;
+    use crate::{Error, Result};
 
     // For some functions taking with a parameter of type CloneFlags,
     // only a subset of these flags have an effect.
@@ -80,9 +80,7 @@ mod sched_linux_like {
             if field >= CpuSet::count() {
                 Err(Error::from(Errno::EINVAL))
             } else {
-                unsafe {
-                    libc::CPU_SET(field, &mut self.cpu_set);
-                }
+                unsafe { libc::CPU_SET(field, &mut self.cpu_set); }
                 Ok(())
             }
         }
@@ -93,9 +91,7 @@ mod sched_linux_like {
             if field >= CpuSet::count() {
                 Err(Error::from(Errno::EINVAL))
             } else {
-                unsafe {
-                    libc::CPU_CLR(field, &mut self.cpu_set);
-                }
+                unsafe { libc::CPU_CLR(field, &mut self.cpu_set);}
                 Ok(())
             }
         }
@@ -204,7 +200,9 @@ mod sched_linux_like {
             let ptr = stack.as_mut_ptr().add(stack.len());
             let ptr_aligned = ptr.sub(ptr as usize % 16);
             libc::clone(
-                mem::transmute(callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32),
+                mem::transmute(
+                    callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32,
+                ),
                 ptr_aligned as *mut c_void,
                 combined,
                 &mut cb as *mut _ as *mut c_void,
