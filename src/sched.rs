@@ -242,11 +242,11 @@ mod sched_scheduler {
         pub enum SchedType {
             #[cfg(target_os = "android")]
             SCHED_NORMAL,
-            #[cfg(any(target_os = "freebsd", target_os = "fuchsia", target_os = "linux", target_os = "netbsd"))]
+            #[cfg(any(target_os = "freebsd", target_os = "fuchsia", target_os = "illumos", target_os = "linux", target_os = "netbsd"))]
             SCHED_OTHER,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
+            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "illumos", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
             SCHED_FIFO,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
+            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "illumos", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
             SCHED_RR,
             #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
             SCHED_BATCH,
@@ -254,6 +254,14 @@ mod sched_scheduler {
             SCHED_IDLE,
             #[cfg(target_os = "android")]
             SCHED_DEADLINE,
+            #[cfg(target_os = "illumos")]
+            SCHED_SYS,
+            #[cfg(target_os = "illumos")]
+            SCHED_IA,
+            #[cfg(target_os = "illumos")]
+            SCHED_FSS,
+            #[cfg(target_os = "illumos")]
+            SCHED_FX,
         }
 
         impl TryFrom<i32>
