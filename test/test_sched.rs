@@ -1,10 +1,15 @@
 use nix::sched::{
-    sched_getaffinity, sched_getparam, sched_getscheduler, sched_setaffinity, sched_setscheduler,
-    CpuSet, SchedParam, SchedPolicy, SchedType,
+    sched_get_priority_min, sched_getparam, sched_getscheduler,
+    sched_setscheduler, SchedParam, SchedPolicy, SchedType,
 };
+#[cfg(not(target_os = "freebsd"))]
+use nix::sched::{sched_getaffinity, sched_setaffinity, CpuSet};
 use nix::unistd::Pid;
 
+use crate::*;
+
 #[test]
+#[cfg(not(target_os = "freebsd"))]
 fn test_sched_affinity() {
     // If pid is zero, then the mask of the calling process is returned.
     let initial_affinity = sched_getaffinity(Pid::from_raw(0)).unwrap();
@@ -35,9 +40,10 @@ fn test_sched_affinity() {
 }
 
 #[test]
-#[cfg(not(target_env = "musl"))]
-fn test_sched_scheduler() {
+#[cfg(not(any(target_env = "musl", target_os = "freebsd")))]
+fn test_sched_scheduler_not_realtime() {
     let initial_scheduler = sched_getscheduler(None).unwrap();
+    let initial_param = sched_getparam(None).unwrap();
 
     // Pick a scheduler other than the current one
     let desired_scheduler = match initial_scheduler.sched_type {
@@ -58,7 +64,40 @@ fn test_sched_scheduler() {
     assert!(sched_getscheduler(None).unwrap().sched_type == desired_scheduler);
 
     // Restore original scheduler
-    sched_setscheduler(None, initial_scheduler, SchedParam::default()).unwrap();
+    sched_setscheduler(None, initial_scheduler, initial_param).unwrap();
+}
+
+#[test]
+#[cfg(not(any(target_env = "musl")))]
+fn test_sched_scheduler_realtime() {
+    skip_if_not_root!("test_sched_scheduler_realtime");
+
+    let initial_scheduler = sched_getscheduler(None).unwrap();
+    let initial_param = sched_getparam(None).unwrap();
+
+    // Pick a real-time scheduler other than the current one
+    let desired_scheduler = match initial_scheduler.sched_type {
+        #[cfg(target_os = "android")]
+        SchedType::SCHED_RR => SchedType::SCHED_NORMAL,
+        #[cfg(any(target_os = "freebsd", target_os = "linux"))]
+        SchedType::SCHED_RR => SchedType::SCHED_OTHER,
+        _ => SchedType::SCHED_RR,
+    };
+    let desired_policy = SchedPolicy::new(desired_scheduler);
+    let desired_priority = sched_get_priority_min(desired_policy).unwrap();
+    sched_setscheduler(
+        None,
+        SchedPolicy::new(desired_scheduler),
+        SchedParam::new(desired_priority),
+    )
+    .unwrap();
+
+    // Check that the scheduler was changed.
+    assert!(sched_getscheduler(None).unwrap().sched_type == desired_scheduler);
+    assert!(sched_getparam(None).unwrap().priority() == desired_priority);
+
+    // Restore original scheduler
+    sched_setscheduler(None, initial_scheduler, initial_param).unwrap();
 }
 
 #[test]

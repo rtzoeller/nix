@@ -244,9 +244,9 @@ mod sched_scheduler {
             SCHED_NORMAL,
             #[cfg(any(target_os = "freebsd", target_os = "fuchsia", target_os = "illumos", target_os = "linux", target_os = "netbsd"))]
             SCHED_OTHER,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "illumos", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
+            #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "fuchsia", target_os = "illumos", target_os = "linux", target_os = "netbsd"))]
             SCHED_FIFO,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "illumos", target_os = "freebsd", target_os = "linux", target_os = "netbsd"))]
+            #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "fuchsia", target_os = "illumos", target_os = "linux", target_os = "netbsd"))]
             SCHED_RR,
             #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
             SCHED_BATCH,
