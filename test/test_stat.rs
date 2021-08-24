@@ -26,6 +26,7 @@ use nix::sys::stat::{fchmodat, utimensat, mkdirat};
           target_os = "haiku",
           target_os = "ios",
           target_os = "macos",
+          target_os = "dragonfly",
           target_os = "freebsd",
           target_os = "netbsd"))]
 use nix::sys::stat::lutimes;
@@ -216,6 +217,7 @@ fn test_utimes() {
           target_os = "haiku",
           target_os = "ios",
           target_os = "macos",
+          target_os = "dragonfly",
           target_os = "freebsd",
           target_os = "netbsd"))]
 fn test_lutimes() {
@@ -307,7 +309,8 @@ fn test_mkdirat_fail() {
 }
 
 #[test]
-#[cfg(not(any(target_os = "freebsd",
+#[cfg(not(any(target_os = "dragonfly",
+              target_os = "freebsd",
               target_os = "ios",
               target_os = "macos",
               target_os = "redox")))]
@@ -324,7 +327,8 @@ fn test_mknod() {
 }
 
 #[test]
-#[cfg(not(any(target_os = "freebsd",
+#[cfg(not(any(target_os = "dragonfly",
+              target_os = "freebsd",
               target_os = "illumos",
               target_os = "ios",
               target_os = "macos",
