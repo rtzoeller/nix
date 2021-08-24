@@ -2,14 +2,14 @@ use nix::sched::{
     sched_get_priority_min, sched_getparam, sched_getscheduler,
     sched_setscheduler, SchedParam, SchedPolicy, SchedType,
 };
-#[cfg(not(target_os = "freebsd"))]
+#[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
 use nix::sched::{sched_getaffinity, sched_setaffinity, CpuSet};
 use nix::unistd::Pid;
 
 use crate::*;
 
 #[test]
-#[cfg(not(target_os = "freebsd"))]
+#[cfg(not(any(target_os = "dragonfly", target_os = "freebsd")))]
 fn test_sched_affinity() {
     // If pid is zero, then the mask of the calling process is returned.
     let initial_affinity = sched_getaffinity(Pid::from_raw(0)).unwrap();
@@ -40,7 +40,7 @@ fn test_sched_affinity() {
 }
 
 #[test]
-#[cfg(not(any(target_env = "musl", target_os = "freebsd")))]
+#[cfg(not(any(target_env = "musl", target_os = "dragonfly", target_os = "freebsd")))]
 fn test_sched_scheduler_not_realtime() {
     let _m = crate::SCHED_MTX.lock().expect("Mutex got poisoned by another test");
 
