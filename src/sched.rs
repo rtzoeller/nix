@@ -281,6 +281,15 @@ mod sched_affinity {
 
         Errno::result(res).and(Ok(cpuset))
     }
+
+    /// Get the CPU on which the calling thread is running.
+    pub fn sched_getcpu() -> Result<i32> {
+        let res = unsafe {
+            libc::sched_getcpu()
+        };
+
+        Errno::result(res)
+    }
 }
 
 /// Explicitly yield the processor to other threads.
