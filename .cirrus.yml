@@ -283,7 +283,7 @@ task:
 # Rust Tier 3 targets can't use Rustup
 task:
   container:
-    image: rustlang/rust:nightly
+    image: docker.io/rustlang/rust:nightly
   env:
     BUILD: check
     TOOLCHAIN: nightly
